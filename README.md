@@ -46,10 +46,16 @@ pip3 install XPPython3
 
 ### 2. Install OnAir Company Client with Wine/Codeweavers
 
+Run the `downloadclient.sh` script to download the OnAir Company client (defaults to `Documents/OnAirCompanyClient`). 
+
+```
+bash downloadclient.sh
+```
+
 #### Option A: Codeweavers CrossOver (Recommended)
 1. Install [Codeweavers CrossOver](https://www.codeweavers.com/crossover)
 2. Create a new Windows 10 bottle
-3. Download and install OnAir Company client in the bottle
+3. Copy the downloaded OnAir Company client files into the bottle and add the client executable as a new application (make sure .NET 4.8 is installed in the bottle)
 4. Configure the client to use local networking (`127.0.0.1`)
 
 #### Option B: Wine (Free Alternative)
@@ -62,9 +68,13 @@ pip3 install XPPython3
    export WINEPREFIX=$HOME/.wine-onair
    winecfg
    ```
-3. Install OnAir Company client:
+3. Copy the downloaded OnAir Company client files into the Wine prefix:
    ```bash
-   wine setup.exe
+   cp -r ~/Documents/OnAirCompanyClient "$WINEPREFIX/drive_c/OnAirCompanyClient"
+   ```
+4. Run the client:
+   ```bash
+   WINEPREFIX=$HOME/.wine-onair wine "$WINEPREFIX/drive_c/OnAirCompanyClient/OnAirCompanyClient.exe"
    ```
 
 ### 3. Install the Python Plugin

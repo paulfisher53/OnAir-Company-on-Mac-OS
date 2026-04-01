@@ -1,0 +1,16 @@
+{
+  "name": "onairmac",
+  "version": "0.0.1",
+  "description": "Run OnAir Company on Mac OS",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulfisher53/OnAir-Company-on-Mac-OS.git"
+  },
+  "author": "Paul Fisher",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/paulfisher53/OnAir-Company-on-Mac-OS/issues"
+  },
+  "homepage": "https://github.com/paulfisher53/OnAir-Company-on-Mac-OS#readme"
+}

@@ -41,6 +41,9 @@ class PythonInterface:
         # Thread lock for struct packing
         self._pack_lock = threading.Lock()
         
+        # Thread lock for file operations to prevent race conditions
+        self._file_lock = threading.Lock()
+        
         # Network settings
         self.server_ip = "127.0.0.1"
         self.server_port = 43230
@@ -929,104 +932,109 @@ class PythonInterface:
     
     def check_paused(self):
         """Check if sim is paused and handle external control"""
-        try:
-            # Check for external pause control file
-            pause_file = os.path.join(self.plugin_dir, "write_pause.oair")
-            if os.path.exists(pause_file):
-                with open(pause_file, 'rb') as f:
-                    # Read XPlaneWritePauseStruct: 1 byte for bool
-                    data = f.read(1)
-                    if len(data) >= 1:
-                        should_pause = struct.unpack('<B', data)[0] != 0
-                        current_paused = xp.getDatai(self.datarefs['paused']) != 0
-                        
-                        if should_pause != current_paused:
-                            # Use the proper X-Plane pause toggle command
-                            pause_cmd = xp.findCommand("sim/operation/pause_toggle")
-                            if pause_cmd is not None:
-                                xp.commandOnce(pause_cmd)
-                        
-                        # Remove file after processing
-                        os.remove(pause_file)
-        except Exception as e:
-            xp.log(f"OnAir Company: Error checking pause: {e}")
+        with self._file_lock:
+            try:
+                # Check for external pause control file
+                pause_file = os.path.join(self.plugin_dir, "write_pause.oair")
+                if os.path.exists(pause_file):
+                    with open(pause_file, 'rb') as f:
+                        # Read XPlaneWritePauseStruct: 1 byte for bool
+                        data = f.read(1)
+                        if len(data) >= 1:
+                            should_pause = struct.unpack('<B', data)[0] != 0
+                            current_paused = xp.getDatai(self.datarefs['paused']) != 0
+                            
+                            if should_pause != current_paused:
+                                # Use the proper X-Plane pause toggle command
+                                pause_cmd = xp.findCommand("sim/operation/pause_toggle")
+                                if pause_cmd is not None:
+                                    xp.commandOnce(pause_cmd)
+                            
+                            # Remove file after processing
+                            os.remove(pause_file)
+            except Exception as e:
+                xp.log(f"OnAir Company: Error checking pause: {e}")
     
     def set_datetime(self):
         """Set sim date/time from external file"""
-        try:
-            datetime_file = os.path.join(self.plugin_dir, "write_date.oair")
-            if os.path.exists(datetime_file):
-                with open(datetime_file, 'rb') as f:
-                    # Read XPlaneWriteDateStruct: float DateZuluSeconds + int DateDays = 8 bytes
-                    data = f.read(8)
-                    if len(data) >= 8:
-                        zulu_time, local_days = struct.unpack('<fi', data)
-                        
-                        xp.setDataf(self.datarefs['zulu_time_sec'], zulu_time)
-                        xp.setDatai(self.datarefs['local_date_days'], local_days)
-                        
-                        # Remove file after processing
-                        os.remove(datetime_file)
-        except Exception as e:
-            xp.log(f"OnAir Company: Error setting datetime: {e}")
+        with self._file_lock:
+            try:
+                datetime_file = os.path.join(self.plugin_dir, "write_date.oair")
+                if os.path.exists(datetime_file):
+                    with open(datetime_file, 'rb') as f:
+                        # Read XPlaneWriteDateStruct: float DateZuluSeconds + int DateDays = 8 bytes
+                        data = f.read(8)
+                        if len(data) >= 8:
+                            zulu_time, local_days = struct.unpack('<fi', data)
+                            
+                            xp.setDataf(self.datarefs['zulu_time_sec'], zulu_time)
+                            xp.setDatai(self.datarefs['local_date_days'], local_days)
+                            
+                            # Remove file after processing
+                            os.remove(datetime_file)
+            except Exception as e:
+                xp.log(f"OnAir Company: Error setting datetime: {e}")
     
     def set_fuel(self):
         """Set fuel quantities from external file"""
-        try:
-            fuel_file = os.path.join(self.plugin_dir, "write_fuel.oair")
-            if os.path.exists(fuel_file):
-                with open(fuel_file, 'rb') as f:
-                    # Read XPlaneWriteFuelStruct: 9 floats = 36 bytes
-                    data = f.read(36)
-                    if len(data) >= 36:
-                        fuel_values = list(struct.unpack('<9f', data))
-                        xp.log(f"OnAir Company: Setting fuel values: {fuel_values}")
-                        xp.setDatavf(self.datarefs['m_fuel'], fuel_values, 0, len(fuel_values))
-                        
-                        # Remove file after processing
-                        os.remove(fuel_file)
-        except Exception as e:
-            xp.log(f"OnAir Company: Error setting fuel: {e}")
+        with self._file_lock:
+            try:
+                fuel_file = os.path.join(self.plugin_dir, "write_fuel.oair")
+                if os.path.exists(fuel_file):
+                    with open(fuel_file, 'rb') as f:
+                        # Read XPlaneWriteFuelStruct: 9 floats = 36 bytes
+                        data = f.read(36)
+                        if len(data) >= 36:
+                            fuel_values = list(struct.unpack('<9f', data))
+                            xp.log(f"OnAir Company: Setting fuel values: {fuel_values}")
+                            xp.setDatavf(self.datarefs['m_fuel'], fuel_values, 0, len(fuel_values))
+                            
+                            # Remove file after processing
+                            os.remove(fuel_file)
+            except Exception as e:
+                xp.log(f"OnAir Company: Error setting fuel: {e}")
     
     def set_weight(self):
         """Set aircraft weight from external file"""
-        try:
-            weight_file = os.path.join(self.plugin_dir, "write_payload.oair")
-            if os.path.exists(weight_file):
-                with open(weight_file, 'rb') as f:
-                    # Read XPlaneWritePayloadStruct: 1 float = 4 bytes
-                    data = f.read(4)
-                    if len(data) >= 4:
-                        weight = struct.unpack('<f', data)[0]
-                        xp.setDataf(self.datarefs['m_fixed'], weight)
-                        
-                        # Remove file after processing
-                        os.remove(weight_file)
-        except Exception as e:
-            xp.log(f"OnAir Company: Error setting weight: {e}")
+        with self._file_lock:
+            try:
+                weight_file = os.path.join(self.plugin_dir, "write_payload.oair")
+                if os.path.exists(weight_file):
+                    with open(weight_file, 'rb') as f:
+                        # Read XPlaneWritePayloadStruct: 1 float = 4 bytes
+                        data = f.read(4)
+                        if len(data) >= 4:
+                            weight = struct.unpack('<f', data)[0]
+                            xp.setDataf(self.datarefs['m_fixed'], weight)
+                            
+                            # Remove file after processing
+                            os.remove(weight_file)
+            except Exception as e:
+                xp.log(f"OnAir Company: Error setting weight: {e}")
     
     def set_position(self):
         """Set aircraft position from external file"""
-        try:
-            position_file = os.path.join(self.plugin_dir, "write_position.oair")
-            if os.path.exists(position_file):
-                with open(position_file, 'rb') as f:
-                    # Read XPlaneWritePositionStruct: 4 floats (Latitude, Longitude, Heading, Altitude) = 16 bytes
-                    data = f.read(16)
-                    if len(data) >= 16:
-                        latitude, longitude, heading, altitude = struct.unpack('<4f', data)
-                        
-                        # Set position data
-                        xp.setDatad(self.datarefs['latitude'], latitude)
-                        xp.setDatad(self.datarefs['longitude'], longitude)
-                        xp.setDataf(self.datarefs['psi'], heading)
-                        if altitude > 0:  # Only set altitude if provided
-                            xp.setDatad(self.datarefs['elevation'], altitude)
-                        
-                        # Remove file after processing
-                        os.remove(position_file)
-        except Exception as e:
-            xp.log(f"OnAir Company: Error setting position: {e}")
+        with self._file_lock:
+            try:
+                position_file = os.path.join(self.plugin_dir, "write_position.oair")
+                if os.path.exists(position_file):
+                    with open(position_file, 'rb') as f:
+                        # Read XPlaneWritePositionStruct: 4 floats (Latitude, Longitude, Heading, Altitude) = 16 bytes
+                        data = f.read(16)
+                        if len(data) >= 16:
+                            latitude, longitude, heading, altitude = struct.unpack('<4f', data)
+                            
+                            # Set position data
+                            xp.setDatad(self.datarefs['latitude'], latitude)
+                            xp.setDatad(self.datarefs['longitude'], longitude)
+                            xp.setDataf(self.datarefs['psi'], heading)
+                            if altitude > 0:  # Only set altitude if provided
+                                xp.setDatad(self.datarefs['elevation'], altitude)
+                            
+                            # Remove file after processing
+                            os.remove(position_file)
+            except Exception as e:
+                xp.log(f"OnAir Company: Error setting position: {e}")
     
     def flight_loop_callback(self, elapsed_since_last_call, elapsed_time_since_last_flightloop, counter, refcon):
         """Main flight loop callback"""
@@ -1073,24 +1081,25 @@ class PythonInterface:
             ]
             
             # Check for new status files and read/delete them
-            for filename, file_color in status_files:
-                filepath = os.path.join(self.plugin_dir, filename)
-                if os.path.exists(filepath):
-                    try:
-                        with open(filepath, 'r') as f:
-                            new_message = f.read().strip()
-                        
-                        # Delete the file after reading
-                        os.remove(filepath)
-                        
-                        # Update current status message if not empty
-                        if new_message:
-                            self.current_status_message = new_message
-                            self.current_status_color = file_color
-                            self.status_message_expires = current_time + 5.0  # Display for 5 seconds
-                        break
-                    except:
-                        continue
+            with self._file_lock:
+                for filename, file_color in status_files:
+                    filepath = os.path.join(self.plugin_dir, filename)
+                    if os.path.exists(filepath):
+                        try:
+                            with open(filepath, 'r') as f:
+                                new_message = f.read().strip()
+                            
+                            # Delete the file after reading
+                            os.remove(filepath)
+                            
+                            # Update current status message if not empty
+                            if new_message:
+                                self.current_status_message = new_message
+                                self.current_status_color = file_color
+                                self.status_message_expires = current_time + 5.0  # Display for 5 seconds
+                            break
+                        except:
+                            continue
             
             # Determine what message to display
             if current_time < self.status_message_expires and self.current_status_message:

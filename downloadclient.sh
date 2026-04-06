@@ -1,7 +1,21 @@
 #!/bin/bash
 
+echo "--- Detecting latest OnAir Company version ---"
+version=$(curl -s "https://auth.onair.company/download_x64/OnAir%20Company.application" | \
+                grep 'assemblyIdentity.*version=' | head -1 | \
+                sed -n 's/.*version="\([0-9.]*\)".*/\1/p' | \
+                tr '.' '_')
+
+if [ -z "$version" ]; then
+    echo "ERROR: Could not detect version automatically. Please check your internet connection."
+    exit 1
+fi
+
+echo "Detected version: $version"
+echo "$version"
+
 # 1. Setup variables
-VERSION="1_6_27_2"
+VERSION=$version
 BASE_URL="https://auth.onair.company/download_x64/Application%20Files/OnAir%20Company_$VERSION"
 TARGET_DIR="$HOME/Documents/OnAirCompanyClient"
 
